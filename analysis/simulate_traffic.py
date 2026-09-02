@@ -11,17 +11,31 @@ The per-variant probabilities are simulation inputs, deliberately fixed -- nothi
 infers degradation from the model; stage b stages an outage so Phase 6's monitor/rollback
 have something real to react to.
 
+**`--product-shift` -- Phase 7 addition (docs/PLAN.md 5.10).** By default every request
+uses a synthetic cold-start user_id (`sim-{stage}-N`), so every request to a given variant
+gets that variant's fixed popularity list back -- there is no user history to vary
+recommendations by. `--product-shift` switches to real user_ids from data/interactions.csv,
+narrowed to a small pool (`--shift-users`, default 15), so the champion's *recommended*
+products concentrate on those few users' shared affinity -- a real shift in the
+`recommendations` distribution drift_monitor.py measures, not just a CTR probability.
+Intended for stage b, so a degraded run trips CTR degradation and recommendation drift
+together (docs/PLAN.md 5.10's "two independent signals"); the base `--stage b` behaviour
+without the flag is unchanged from Phase 6.
+
 Usage:
     python analysis/simulate_traffic.py                  # stage a, 10000 requests
     python analysis/simulate_traffic.py --stage b --n 5000
+    python analysis/simulate_traffic.py --stage b --product-shift   # + recommendation drift
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
 import random
 import sys
+from pathlib import Path
 
 # Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -31,6 +45,8 @@ import httpx
 DEFAULT_ROUTER_URL = "http://localhost:8000"
 DEFAULT_N = 10000
 DEFAULT_CONCURRENCY = 50
+DEFAULT_DATA = Path(__file__).resolve().parent.parent / "data" / "interactions.csv"
+DEFAULT_SHIFT_USERS = 15
 
 # variant -> CTR, by stage. docs/PLAN.md 5.7's table.
 STAGE_CTR = {
@@ -69,6 +85,11 @@ async def run_one(
         return variant, clicked, purchased
 
 
+def load_user_ids(path: Path) -> list[str]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return sorted({row["user_id"] for row in csv.DictReader(handle)})
+
+
 async def run(args: argparse.Namespace) -> None:
     ctr_by_variant = STAGE_CTR[args.stage]
     rng = random.Random(args.seed)
@@ -76,9 +97,16 @@ async def run(args: argparse.Namespace) -> None:
 
     counts = {"v1": {"requests": 0, "clicks": 0, "purchases": 0}, "v2": {"requests": 0, "clicks": 0, "purchases": 0}}
 
+    if args.product_shift:
+        pool = load_user_ids(args.data)[: args.shift_users]
+        print(f"product-shift: sampling {args.n} requests from a {len(pool)}-user pool (real user_ids)")
+        user_ids = [rng.choice(pool) for _ in range(args.n)]
+    else:
+        user_ids = [f"sim-{args.stage}-{i:05d}" for i in range(args.n)]
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         tasks = [
-            run_one(client, semaphore, args.router_url, f"sim-{args.stage}-{i:05d}", ctr_by_variant, rng)
+            run_one(client, semaphore, args.router_url, user_ids[i], ctr_by_variant, rng)
             for i in range(args.n)
         ]
         for coro in asyncio.as_completed(tasks):
@@ -106,6 +134,16 @@ def main() -> None:
     parser.add_argument("--router-url", default=DEFAULT_ROUTER_URL)
     parser.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--data", type=Path, default=DEFAULT_DATA, help="interactions.csv, for --product-shift's real user_ids")
+    parser.add_argument(
+        "--product-shift", action="store_true",
+        help="sample from a narrow pool of real user_ids instead of synthetic cold-start ids, "
+        "so recommended products visibly shift too (intended for --stage b, docs/PLAN.md 5.10)",
+    )
+    parser.add_argument(
+        "--shift-users", type=int, default=DEFAULT_SHIFT_USERS,
+        help="user pool size when --product-shift is set (default: %(default)s)",
+    )
     args = parser.parse_args()
     asyncio.run(run(args))
 

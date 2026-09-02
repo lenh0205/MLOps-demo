@@ -19,8 +19,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Windows consoles still default to cp1252, which cannot encode arrows (nor, later,
@@ -61,14 +64,39 @@ def load_interactions(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def git_commit() -> str:
+    """The commit that produced this run, so a registered version's lineage is an
+    answerable query instead of an assumption (docs/PLAN.md 5.4, Phase 7)."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def dataset_hash(path: Path) -> str:
+    """SHA-256 of the exact dataset file trained on — pairs with git_commit to answer
+    "which code and which data produced this version" (docs/PLAN.md 5.4, Phase 7)."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def train_one(
     purchase_weight: float,
     train_df: pd.DataFrame,
     holdout: dict[str, str],
     k: int,
+    lineage_tags: dict[str, str],
 ) -> tuple[str, dict[str, float]]:
     """One MLflow run: fit, evaluate, log, register. Returns (version, metrics)."""
     with mlflow.start_run(run_name=f"pw={purchase_weight:g}") as run:
+        mlflow.set_tags({**lineage_tags, "training_timestamp": datetime.now(timezone.utc).isoformat()})
+
         model = ProductRecommender(purchase_weight=purchase_weight).fit(train_df)
         metrics = evaluate(model, holdout, k=k)
 
@@ -123,6 +151,9 @@ def main() -> None:
 
     mlflow.set_experiment(EXPERIMENT)
 
+    lineage_tags = {"git_commit": git_commit(), "dataset_hash": dataset_hash(args.data)}
+    print(f"lineage  -> git_commit={lineage_tags['git_commit'][:8]}  dataset_hash={lineage_tags['dataset_hash'][:12]}")
+
     client = MlflowClient()
 
     # Idempotency (docs/PLAN.md 5.4): re-running this against a registry that already has
@@ -141,7 +172,7 @@ def main() -> None:
 
     results: dict[str, dict[str, float]] = {}
     for label, purchase_weight, alias in VARIANTS:
-        version, metrics = train_one(purchase_weight, train_df, holdout, args.k)
+        version, metrics = train_one(purchase_weight, train_df, holdout, args.k, lineage_tags)
         results[label] = metrics
 
         # Serving resolves models by alias, never by number (docs/PLAN.md 5.5), so the
