@@ -1,0 +1,13 @@
+# Same pins as trainer/requirements.txt -- version drift between the container that logs
+# a model and the container that loads it is the classic way this demo breaks (see
+# docs/PLAN.md invariants and gotcha 6).
+mlflow==3.8.1
+pandas==2.3.3
+scikit-learn==1.9.0
+numpy==2.5.2
+cloudpickle==3.1.2
+
+# Serving layer. Pinned to what mlflow-skinny already pulled into .venv in Phase 1/2, so
+# there is no second resolver decision to make.
+fastapi==0.141.1
+uvicorn==0.52.4
