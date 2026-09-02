@@ -15,3 +15,8 @@ mlflow-stack/.env
 
 # MLflow local dev server scratch (Phase 1, no Docker) - see docs/INSTALLED.md
 mlartifacts/
+
+# Project instructions/docs: kept locally, not tracked in git history
+docs/
+CLAUDE.md
+AGENTS.md
