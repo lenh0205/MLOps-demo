@@ -1,0 +1,19 @@
+# Exact pins, captured from the first successful install (Phase 1, Python 3.12.3 under WSL2).
+#
+# The trainer and model-api MUST end up on the same mlflow version — version drift
+# between the image that logs a model and the image that loads it is the classic way
+# this demo breaks. See docs/PLAN.md section 5.4 and gotcha 6.
+#
+# mlflow-stack/.env pins the *server* image to v3.8.1 -- the SAME version. 3.8.1 is the
+# newest that exists BOTH on PyPI and as a ghcr.io/mlflow/mlflow image: the published
+# image lags the pip package badly (pip was on 3.15.2 while the newest image was v3.8.1),
+# so "pin the same version everywhere" means picking one that exists in both places.
+mlflow==3.8.1
+pandas==2.3.3
+scikit-learn==1.9.0
+numpy==2.5.2
+
+# Pinned because it does the actual model serialization: cloudpickle writes the artifact
+# in the trainer and reads it back in the serving container, so a mismatch here fails at
+# load time, not at build time.
+cloudpickle==3.1.2

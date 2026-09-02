@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# MLflow local scratch (the real stores live in Postgres + the artifact store)
+mlruns/
+mlflow.db
+
+# Secrets: the official stack's .env is generated from .env.dev.example, never committed
+mlflow-stack/.env
+.env
+
+# MLflow local dev server scratch (Phase 1, no Docker) - see docs/INSTALLED.md
+mlartifacts/

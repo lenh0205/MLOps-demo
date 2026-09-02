@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Phase 0 is plain modules, not an installed package: point pytest at the source
+# directories rather than adding packaging machinery the exercise does not need.
+pythonpath = ["trainer", "data", "ab-router", "analysis"]
+testpaths = ["tests"]
+addopts = "-q"
