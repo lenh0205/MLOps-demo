@@ -124,6 +124,21 @@ def main() -> None:
     mlflow.set_experiment(EXPERIMENT)
 
     client = MlflowClient()
+
+    # Idempotency (docs/PLAN.md 5.4): re-running this against a registry that already has
+    # both variants would otherwise mint v3/v4 on every `docker compose up`. Skip instead
+    # of training again, and drive serving by alias/version numbers already in place.
+    existing_versions = client.search_model_versions(f"name='{REGISTERED_MODEL}'")
+    if len(existing_versions) >= len(VARIANTS):
+        print(
+            f"{REGISTERED_MODEL} already has {len(existing_versions)} version(s) — "
+            "skipping training (idempotent)."
+        )
+        for _, _, alias in VARIANTS:
+            mv = client.get_model_version_by_alias(REGISTERED_MODEL, alias)
+            print(f"  @{alias} -> v{mv.version}")
+        return
+
     results: dict[str, dict[str, float]] = {}
     for label, purchase_weight, alias in VARIANTS:
         version, metrics = train_one(purchase_weight, train_df, holdout, args.k)

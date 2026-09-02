@@ -1,0 +1,60 @@
+# Our services only (docs/PLAN.md 2, 4). Joins the official MLflow stack's network by
+# name rather than deriving it from a project/COMPOSE_PROJECT_NAME trick (gotcha 1).
+#
+# Bring both stacks up with:
+#   docker compose -f mlflow-stack/docker-compose.yml up -d
+#   docker compose -f mlflow-stack/docker-compose.yml -f docker-compose.yml up -d
+
+services:
+  # Override, not a copy: mlflow-stack/ stays untouched (gotcha 7), and Compose merges
+  # this environment map into the vendored `mlflow` service's own. mlflow 3.8.1 added
+  # Host-header validation that defaults to localhost + private IPs only (see gotcha 13
+  # in docs/PLAN.md) — without this, any request whose Host header is the Compose service
+  # name (e.g. "mlflow:5000", as trainer/model-api send) gets a 403.
+  mlflow:
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow,mlflow:*,localhost,localhost:*,127.0.0.1,127.0.0.1:*"
+
+  trainer:
+    build:
+      context: .
+      dockerfile: trainer/Dockerfile
+    container_name: trainer
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    restart: "no"
+
+  model-v1:
+    build:
+      context: .
+      dockerfile: model-api/Dockerfile
+    image: mlops-demo/model-api:latest
+    container_name: model-v1
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_URI: models:/product-recommender/1
+    ports:
+      - "8001:8000"
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+
+  model-v2:
+    build:
+      context: .
+      dockerfile: model-api/Dockerfile
+    image: mlops-demo/model-api:latest
+    container_name: model-v2
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_URI: models:/product-recommender/2
+    ports:
+      - "8002:8000"
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+
+networks:
+  default:
+    name: mlflow-network
+    external: true
