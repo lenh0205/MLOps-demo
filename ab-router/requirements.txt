@@ -1,0 +1,17 @@
+# Router layer -- proxies /recommend to model-v1 / model-v2 and logs assignment +
+# outcome to events-db (docs/PLAN.md 5.6). Exact pins captured from the first
+# successful install (Phase 4, Python 3.12.3 under WSL2), same policy as
+# trainer/requirements.txt and model-api/requirements.txt.
+
+# Same web layer as model-api, so both APIs behave identically to a client.
+fastapi==0.141.1
+uvicorn==0.52.4
+
+# Async HTTP client -- proxying inside an async FastAPI endpoint with blocking
+# `requests` would stall the event loop for every other in-flight request
+# (docs/PLAN.md 5.6).
+httpx==0.28.1
+
+# Async Postgres driver for events-db, paired with httpx so neither the upstream
+# proxy call nor the event-log write blocks the loop.
+asyncpg==0.31.0

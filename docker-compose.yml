@@ -54,6 +54,51 @@ services:
       trainer:
         condition: service_completed_successfully
 
+  # Our own small Postgres for A/B outcomes (docs/PLAN.md 2, 5.6) — deliberately not
+  # mlflow-postgres: the experiment store is application data, not MLflow metadata.
+  # schema.sql is mounted into docker-entrypoint-initdb.d, so Postgres creates
+  # experiment_events itself the first time this container's volume is initialized.
+  events-db:
+    image: postgres:15
+    container_name: events-db
+    environment:
+      POSTGRES_USER: ab_events
+      POSTGRES_PASSWORD: ab_events
+      POSTGRES_DB: ab_events
+    volumes:
+      - events-db-data:/var/lib/postgresql/data
+      - ./ab-router/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ab_events -d ab_events"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ab-router:
+    build:
+      context: .
+      dockerfile: ab-router/Dockerfile
+    container_name: ab-router
+    environment:
+      EVENTS_DATABASE_URL: postgresql://ab_events:ab_events@events-db:5432/ab_events
+      MODEL_V1_URL: http://model-v1:8000
+      MODEL_V2_URL: http://model-v2:8000
+      SPLIT_PCT: "50"
+    ports:
+      - "8000:8000"
+    depends_on:
+      events-db:
+        condition: service_healthy
+      model-v1:
+        condition: service_healthy
+      model-v2:
+        condition: service_healthy
+
+volumes:
+  events-db-data:
+
 networks:
   default:
     name: mlflow-network
