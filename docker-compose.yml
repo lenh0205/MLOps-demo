@@ -54,6 +54,26 @@ services:
       trainer:
         condition: service_completed_successfully
 
+  # Production, distinct from the A/B arms above: model-v1/model-v2 are pinned by version
+  # number *on purpose*, because an experiment must name exactly which versions it is
+  # comparing (docs/PLAN.md 5.5). This service is what @champion actually means at
+  # runtime — the container promote_model.py / rollback_model.py's /reload targets, and
+  # the one whose /health flips between v1 and v2 with no rebuild (docs/PLAN.md 7.12).
+  model-champion:
+    build:
+      context: .
+      dockerfile: model-api/Dockerfile
+    image: mlops-demo/model-api:latest
+    container_name: model-champion
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_URI: models:/product-recommender@champion
+    ports:
+      - "8003:8000"
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+
   # Our own small Postgres for A/B outcomes (docs/PLAN.md 2, 5.6) — deliberately not
   # mlflow-postgres: the experiment store is application data, not MLflow metadata.
   # schema.sql is mounted into docker-entrypoint-initdb.d, so Postgres creates

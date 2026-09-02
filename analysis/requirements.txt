@@ -1,0 +1,13 @@
+# Evaluation + promotion layer -- Phase 5 of docs/PLAN.md. Runs from the host (local venv),
+# talking to the router / events-db / MLflow over their published ports, not the Compose
+# network -- so these are host-side clients, same versions as everywhere else pins.
+
+# Same async HTTP client as ab-router, for simulate_traffic.py and promote_model.py's /reload.
+httpx==0.28.1
+
+# Same async Postgres driver as ab-router -- evaluate_ab.py reads events-db with it rather
+# than adding a second (sync) driver just for one read-only query.
+asyncpg==0.31.0
+
+# promote_model.py drops to MlflowClient.set_registered_model_alias (docs/PLAN.md 3.2, 5.9).
+mlflow==3.8.1
