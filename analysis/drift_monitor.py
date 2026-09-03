@@ -26,6 +26,15 @@ Usage:
     python analysis/drift_monitor.py                # inspects whichever version @champion resolves to
     python analysis/drift_monitor.py --version v2
     python analysis/drift_monitor.py --window 5m --min-sample-size 500
+
+Phase 8 addition (docs/PLAN.md 5.11): each run appends its verdict to a small local
+history file and, if drift has been persistent across the last two checks *and* the
+sample floor is met *and* the training data still passes a basic quality check, calls
+Airflow's REST API to kick off the `continuous_training` DAG (check_data -> train ->
+evaluate -> register) and stops -- it does not poll the DAG's outcome. That gate is why a
+single noisy DRIFT reading never triggers a retrain by itself:
+
+    python analysis/drift_monitor.py --airflow-url http://localhost:8080
 """
 
 from __future__ import annotations
@@ -33,15 +42,19 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import json
 import math
 import os
 import sys
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import asyncpg
+import httpx
 from mlflow.tracking import MlflowClient
 
 from evaluate_ab import DEFAULT_DATABASE_URL
@@ -49,6 +62,84 @@ from monitor import check_alerts, fetch_windowed_stats, parse_duration
 
 REGISTERED_MODEL = "product-recommender"
 DEFAULT_DATA = Path(__file__).resolve().parent.parent / "data" / "interactions.csv"
+
+# Phase 8 (docs/PLAN.md 5.11): the Continuous Training trigger gate and its Airflow call.
+DEFAULT_HISTORY_PATH = Path(__file__).resolve().parent / ".drift_history.json"
+HISTORY_LIMIT = 5  # only the last 2 checks matter to should_trigger_ct; a few more is plenty for debugging
+CT_DAG_ID = "continuous_training"
+DEFAULT_AIRFLOW_URL = os.environ.get("AIRFLOW_URL", "http://localhost:8080")
+DEFAULT_AIRFLOW_USERNAME = os.environ.get("AIRFLOW_USERNAME", "admin")
+DEFAULT_AIRFLOW_PASSWORD = os.environ.get("AIRFLOW_PASSWORD", "admin")
+REQUIRED_DATA_COLUMNS = {"user_id", "product_id", "event", "timestamp"}
+
+
+@dataclass
+class DriftResult:
+    verdict: str  # "OK" | "WARNING" | "DRIFT"
+    timestamp: str  # UTC ISO-8601, when this check ran
+
+
+_VERDICT_ORDER = {"n/a": -1, "OK": 0, "WARNING": 1, "DRIFT": 2}
+
+
+def combined_verdict(data_status: str, rec_status: str) -> str:
+    """The worse of the data-drift and recommendation-drift verdicts for one check --
+    what gets appended to the history should_trigger_ct reads."""
+    worse = max(data_status, rec_status, key=lambda status: _VERDICT_ORDER.get(status, -1))
+    return worse if _VERDICT_ORDER.get(worse, -1) >= 0 else "OK"
+
+
+def load_drift_history(path: Path) -> list[DriftResult]:
+    if not path.exists():
+        return []
+    return [DriftResult(**item) for item in json.loads(path.read_text())]
+
+
+def save_drift_history(path: Path, history: list[DriftResult]) -> None:
+    path.write_text(json.dumps([asdict(r) for r in history[-HISTORY_LIMIT:]]))
+
+
+def data_quality_ok(data_path: Path) -> bool:
+    """A cheap schema/null check on the training data (docs/PLAN.md 5.11) -- the same
+    thing the CT DAG's own check_data task validates, so the trigger never fires on data
+    the DAG would immediately reject anyway."""
+    try:
+        with data_path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            if not REQUIRED_DATA_COLUMNS.issubset(reader.fieldnames or []):
+                return False
+            return all(
+                value not in (None, "") for row in reader for value in row.values()
+            )
+    except OSError:
+        return False
+
+
+def should_trigger_ct(
+    drift_history: list[DriftResult], sample_size: int, min_sample_size: int, data_ok: bool
+) -> bool:
+    """docs/PLAN.md 5.11's combined gate. Drift alone is not enough: it has to be
+    persistent across the last two checks (not one noisy reading), the window has to have
+    enough traffic to trust, and the data has to still look sane."""
+    return (
+        len(drift_history) >= 2
+        and all(result.verdict == "DRIFT" for result in drift_history[-2:])
+        and sample_size >= min_sample_size
+        and data_ok
+    )
+
+
+def trigger_continuous_training(airflow_url: str, username: str, password: str) -> str:
+    """POSTs to Airflow's REST API and returns the new run's id. Raises on any HTTP
+    failure -- the caller decides how to report that, this function does not swallow it."""
+    response = httpx.post(
+        f"{airflow_url}/api/v1/dags/{CT_DAG_ID}/dagRuns",
+        json={},  # let Airflow assign dag_run_id/logical_date
+        auth=(username, password),
+        timeout=10.0,
+    )
+    response.raise_for_status()
+    return response.json().get("dag_run_id", "?")
 
 # Same convention as promote_model.py's LABEL_TO_VERSION, inverted -- v1/v2 register in
 # that fixed order in trainer/train.py's VARIANTS tuple.
@@ -252,6 +343,35 @@ async def run(args: argparse.Namespace) -> None:
     else:
         print("no drift detected.")
 
+    if args.no_ct_trigger:
+        return
+
+    # -- Phase 8 (docs/PLAN.md 5.11): persist this check's verdict and, only if drift has
+    # been persistent across the last two checks *and* there's enough traffic to trust it
+    # *and* the training data still looks sane, hand off to Airflow. One HTTP call, then
+    # stop -- the DAG's own progress is Airflow's UI/logs to inspect (human-in-the-loop),
+    # not something this script polls for.
+    verdict = combined_verdict(data_status, rec_status)
+    history = load_drift_history(args.history_path)
+    history.append(DriftResult(verdict=verdict, timestamp=datetime.now(timezone.utc).isoformat()))
+    save_drift_history(args.history_path, history)
+
+    combined_sample_size = min(recent_engaged_n, recent_requests)
+    data_ok = data_quality_ok(args.data)
+    if should_trigger_ct(history, combined_sample_size, args.min_sample_size, data_ok):
+        print(
+            f"\nCT TRIGGER -- drift persistent across the last 2 checks, "
+            f"n={combined_sample_size} >= {args.min_sample_size}, data OK -> "
+            f"POST {args.airflow_url}/api/v1/dags/{CT_DAG_ID}/dagRuns"
+        )
+        try:
+            dag_run_id = trigger_continuous_training(
+                args.airflow_url, args.airflow_username, args.airflow_password
+            )
+            print(f"triggered {CT_DAG_ID} -> dag_run_id={dag_run_id}")
+        except httpx.HTTPError as exc:
+            print(f"could not trigger {CT_DAG_ID}: {exc}")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -272,6 +392,17 @@ def main() -> None:
     parser.add_argument("--alert-ratio", type=float, default=float(os.environ.get("ALERT_RATIO", 0.8)))
     parser.add_argument("--baseline-ctr-v1", type=float, default=float(os.environ.get("BASELINE_CTR_V1", 0.072)))
     parser.add_argument("--baseline-ctr-v2", type=float, default=float(os.environ.get("BASELINE_CTR_V2", 0.110)))
+    parser.add_argument(
+        "--history-path", type=Path, default=DEFAULT_HISTORY_PATH,
+        help="where consecutive-check drift history for the CT trigger gate is kept (default: %(default)s)",
+    )
+    parser.add_argument("--airflow-url", default=DEFAULT_AIRFLOW_URL, help="default: %(default)s")
+    parser.add_argument("--airflow-username", default=DEFAULT_AIRFLOW_USERNAME)
+    parser.add_argument("--airflow-password", default=DEFAULT_AIRFLOW_PASSWORD)
+    parser.add_argument(
+        "--no-ct-trigger", action="store_true",
+        help="skip the Phase 8 history update and Airflow trigger check entirely",
+    )
     args = parser.parse_args()
     args.window_seconds = parse_duration(args.window)
 

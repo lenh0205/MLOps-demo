@@ -29,7 +29,11 @@ from pathlib import Path
 # Windows consoles still default to cp1252, which cannot encode arrows (nor, later,
 # monitor.py's alert emoji). Fail soft on the console rather than crashing a training
 # run over a decorative character. See docs/PLAN.md section 7 item 11.
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+# Guarded with hasattr -- found running this module inside an Airflow task (Phase 8):
+# Airflow replaces sys.stdout with its own StreamLogWriter, which has no .reconfigure(),
+# so the unguarded call raised AttributeError before a single line of train.py ran.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import mlflow
 import pandas as pd
@@ -126,11 +130,65 @@ def train_one(
         return str(version), metrics
 
 
+def retrain_candidate(
+    data_path: Path = DEFAULT_DATA,
+    purchase_weight: float = 5.0,
+    k: int = 5,
+) -> tuple[str, dict[str, float]]:
+    """Continuous Training's `train` task (docs/PLAN.md 5.11) — one new candidate
+    version, not a fresh v1/v2 pair.
+
+    Deliberately distinct from main()'s bootstrap path: main() skips training entirely
+    once both variants exist (the idempotency guard above, section 5.4), which is correct
+    for the one-shot Compose bootstrap but wrong for a deliberate retrain. This function
+    has no idempotency check — every call registers a new version — and it never touches
+    an alias itself. Pointing `@challenger` at the result is the CT DAG's `register` task
+    alone (airflow/dags/ct_tasks.py); `@champion` still only ever moves through the
+    human-run promote_model.py (5.9).
+
+    `purchase_weight` defaults to V2's value (5.0): the point of this phase is proving the
+    retrain pipeline runs end to end, not searching hyperparameters, so it reuses the
+    weight that already won the A/B test rather than guessing a new one.
+    """
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+    if not tracking_uri:
+        raise SystemExit(
+            "MLFLOW_TRACKING_URI is not set. Point it at the tracking server, e.g.\n"
+            "    export MLFLOW_TRACKING_URI=http://localhost:5000"
+        )
+
+    interactions = load_interactions(data_path)
+    train_df, holdout = temporal_holdout(interactions)
+    mlflow.set_experiment(EXPERIMENT)
+
+    lineage_tags = {
+        "git_commit": git_commit(),
+        "dataset_hash": dataset_hash(data_path),
+        "trigger": "continuous_training",
+    }
+    return train_one(purchase_weight, train_df, holdout, k, lineage_tags)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument(
+        "--retrain", action="store_true",
+        help="skip the v1/v2 bootstrap and register exactly one new candidate version "
+        "instead (docs/PLAN.md 5.11) — manual equivalent of the CT DAG's train task, "
+        "for testing outside Airflow. Does not touch any alias.",
+    )
+    parser.add_argument(
+        "--purchase-weight", type=float, default=5.0,
+        help="candidate's purchase_weight when --retrain is set (default: %(default)s)",
+    )
     args = parser.parse_args()
+
+    if args.retrain:
+        version, metrics = retrain_candidate(args.data, args.purchase_weight, args.k)
+        print(f"\ncandidate -> {REGISTERED_MODEL} v{version} (no alias moved)")
+        return
 
     tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
     if not tracking_uri:

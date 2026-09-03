@@ -20,3 +20,6 @@ mlartifacts/
 docs/
 CLAUDE.md
 AGENTS.md
+
+# drift_monitor.py's local Continuous Training trigger-gate state (Phase 8, docs/PLAN.md 5.11)
+analysis/.drift_history.json
