@@ -3,7 +3,7 @@
 
 Pure-function coverage only, same split as everywhere else in this repo: the two DAG
 tasks that need a live MLflow server (train, evaluate-against-champion) are exercised
-manually against the real stack, not here (docs/PLAN.md 6).
+manually against the real stack, not here.
 """
 
 from __future__ import annotations

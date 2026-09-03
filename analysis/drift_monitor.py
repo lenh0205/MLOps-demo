@@ -1,6 +1,6 @@
-"""Drift detection -- Phase 7 of docs/PLAN.md (5.10).
+"""Drift detection -- Phase 7.
 
-Answers two questions upstream of the performance question monitor.py (5.8) asks
+Answers two questions upstream of the performance question monitor.py asks
 ("is the model producing worse outcomes?"):
 
     data drift            has PRODUCTION DATA changed?     event-type mix (click vs
@@ -15,19 +15,19 @@ one -- so one function, `psi()` (population stability index), serves both. Hand-
 no new dependency, same spirit as evaluate_ab.py's two-proportion z-test.
 
 Drift does not auto-rollback. This script prints a table and a verdict, nothing more --
-the same human-in-the-loop principle as promote_model.py / rollback_model.py (5.9):
+the same human-in-the-loop principle as promote_model.py / rollback_model.py:
 
     DRIFT DETECTED
           |
           +-- performance OK       -> keep monitoring
-          +-- performance degraded -> rollback / retrain (5.9)
+          +-- performance degraded -> rollback / retrain
 
 Usage:
     python analysis/drift_monitor.py                # inspects whichever version @champion resolves to
     python analysis/drift_monitor.py --version v2
     python analysis/drift_monitor.py --window 5m --min-sample-size 500
 
-Phase 8 addition (docs/PLAN.md 5.11): each run appends its verdict to a small local
+Phase 8 addition: each run appends its verdict to a small local
 history file and, if drift has been persistent across the last two checks *and* the
 sample floor is met *and* the training data still passes a basic quality check, calls
 Airflow's REST API to kick off the `continuous_training` DAG (check_data -> train ->
@@ -50,7 +50,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import asyncpg
@@ -63,7 +63,7 @@ from monitor import check_alerts, fetch_windowed_stats, parse_duration
 REGISTERED_MODEL = "product-recommender"
 DEFAULT_DATA = Path(__file__).resolve().parent.parent / "data" / "interactions.csv"
 
-# Phase 8 (docs/PLAN.md 5.11): the Continuous Training trigger gate and its Airflow call.
+# Phase 8: the Continuous Training trigger gate and its Airflow call.
 DEFAULT_HISTORY_PATH = Path(__file__).resolve().parent / ".drift_history.json"
 HISTORY_LIMIT = 5  # only the last 2 checks matter to should_trigger_ct; a few more is plenty for debugging
 CT_DAG_ID = "continuous_training"
@@ -100,7 +100,7 @@ def save_drift_history(path: Path, history: list[DriftResult]) -> None:
 
 
 def data_quality_ok(data_path: Path) -> bool:
-    """A cheap schema/null check on the training data (docs/PLAN.md 5.11) -- the same
+    """A cheap schema/null check on the training data -- the same
     thing the CT DAG's own check_data task validates, so the trigger never fires on data
     the DAG would immediately reject anyway."""
     try:
@@ -118,7 +118,7 @@ def data_quality_ok(data_path: Path) -> bool:
 def should_trigger_ct(
     drift_history: list[DriftResult], sample_size: int, min_sample_size: int, data_ok: bool
 ) -> bool:
-    """docs/PLAN.md 5.11's combined gate. Drift alone is not enough: it has to be
+    """The combined gate. Drift alone is not enough: it has to be
     persistent across the last two checks (not one noisy reading), the window has to have
     enough traffic to trust, and the data has to still look sane."""
     return (
@@ -145,7 +145,7 @@ def trigger_continuous_training(airflow_url: str, username: str, password: str) 
 # that fixed order in trainer/train.py's VARIANTS tuple.
 VERSION_TO_LABEL = {"1": "v1", "2": "v2"}
 
-# docs/PLAN.md 5.10's fixed thresholds -- not a tuned model.
+# Fixed thresholds -- not a tuned model.
 PSI_WARNING = 0.10
 PSI_DRIFT = 0.25
 
@@ -155,8 +155,8 @@ EPSILON = 1e-4
 
 
 def psi(reference: dict[str, float], recent: dict[str, float]) -> float:
-    """Population stability index between two categorical distributions (docs/PLAN.md
-    5.10). Both dicts are category -> proportion (need not share the same categories)."""
+    """Population stability index between two categorical distributions.
+    Both dicts are category -> proportion (need not share the same categories)."""
     total = 0.0
     for category in set(reference) | set(recent):
         ref_pct = max(reference.get(category, 0.0), EPSILON)
@@ -191,7 +191,7 @@ def resolve_champion_label() -> str:
 
 def training_event_mix(data_path: Path) -> dict[str, float]:
     """Reference distribution: the click/purchase split data/interactions.csv had at
-    training time (docs/PLAN.md 5.10)."""
+    training time."""
     counts: dict[str, int] = {}
     with data_path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
@@ -323,7 +323,7 @@ async def run(args: argparse.Namespace) -> None:
     caveat = f"  (low sample, n={min(reference_requests, recent_requests)})" if low_sample else ""
     print(f"PSI = {rec_psi:.3f} -> {rec_status}{caveat}\n")
 
-    # -- tie to performance, same windowed/gated check monitor.py uses (5.8)
+    # -- tie to performance, same windowed/gated check monitor.py uses
     stats = await fetch_windowed_stats(args.database_url, window_seconds)
     for v in ("v1", "v2"):
         stats.setdefault(v, {"requests": 0, "clicks": 0, "purchases": 0})
@@ -346,7 +346,7 @@ async def run(args: argparse.Namespace) -> None:
     if args.no_ct_trigger:
         return
 
-    # -- Phase 8 (docs/PLAN.md 5.11): persist this check's verdict and, only if drift has
+    # -- Phase 8: persist this check's verdict and, only if drift has
     # been persistent across the last two checks *and* there's enough traffic to trust it
     # *and* the training data still looks sane, hand off to Airflow. One HTTP call, then
     # stop -- the DAG's own progress is Airflow's UI/logs to inspect (human-in-the-loop),

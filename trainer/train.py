@@ -9,7 +9,7 @@ Runs the whole offline half of the lifecycle in one shot:
 There is deliberately **no** `mlflow.set_tracking_uri(...)` call. The SDK reads
 `MLFLOW_TRACKING_URI` from the environment, which is `http://localhost:5000` from a local
 venv and `http://mlflow:5000` inside Compose. That indirection is the only reason this
-same file runs unchanged in Phase 1 and Phase 3 (see docs/PLAN.md section 3.2).
+same file runs unchanged in Phase 1 and Phase 3.
 
 Usage:
     python trainer/train.py
@@ -28,7 +28,7 @@ from pathlib import Path
 
 # Windows consoles still default to cp1252, which cannot encode arrows (nor, later,
 # monitor.py's alert emoji). Fail soft on the console rather than crashing a training
-# run over a decorative character. See docs/PLAN.md section 7 item 11.
+# run over a decorative character.
 # Guarded with hasattr -- found running this module inside an Airflow task (Phase 8):
 # Airflow replaces sys.stdout with its own StreamLogWriter, which has no .reconfigure(),
 # so the unguarded call raised AttributeError before a single line of train.py ran.
@@ -49,7 +49,7 @@ DEFAULT_DATA = Path(__file__).resolve().parent.parent / "data" / "interactions.c
 # cloudpickle stores the model class *by reference*, so without shipping this file the
 # artifact only loads on a machine that already happens to have `recommender` importable.
 # Packaging it is what makes the pyfunc artifact genuinely self-contained -- which is the
-# entire reason we chose pyfunc over pickle (docs/PLAN.md section 2).
+# entire reason we chose pyfunc over pickle.
 CODE_PATHS = [str(Path(__file__).resolve().parent / "recommender.py")]
 
 # V1 vs V2 is exactly one parameter. Keep it that way: the demo's whole point is that the
@@ -70,7 +70,7 @@ def load_interactions(path: Path) -> pd.DataFrame:
 
 def git_commit() -> str:
     """The commit that produced this run, so a registered version's lineage is an
-    answerable query instead of an assumption (docs/PLAN.md 5.4, Phase 7)."""
+    answerable query instead of an assumption (Phase 7)."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -86,7 +86,7 @@ def git_commit() -> str:
 
 def dataset_hash(path: Path) -> str:
     """SHA-256 of the exact dataset file trained on — pairs with git_commit to answer
-    "which code and which data produced this version" (docs/PLAN.md 5.4, Phase 7)."""
+    "which code and which data produced this version" (Phase 7)."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -135,16 +135,16 @@ def retrain_candidate(
     purchase_weight: float = 5.0,
     k: int = 5,
 ) -> tuple[str, dict[str, float]]:
-    """Continuous Training's `train` task (docs/PLAN.md 5.11) — one new candidate
+    """Continuous Training's `train` task — one new candidate
     version, not a fresh v1/v2 pair.
 
     Deliberately distinct from main()'s bootstrap path: main() skips training entirely
-    once both variants exist (the idempotency guard above, section 5.4), which is correct
+    once both variants exist (the idempotency guard above), which is correct
     for the one-shot Compose bootstrap but wrong for a deliberate retrain. This function
     has no idempotency check — every call registers a new version — and it never touches
     an alias itself. Pointing `@challenger` at the result is the CT DAG's `register` task
     alone (airflow/dags/ct_tasks.py); `@champion` still only ever moves through the
-    human-run promote_model.py (5.9).
+    human-run promote_model.py.
 
     `purchase_weight` defaults to V2's value (5.0): the point of this phase is proving the
     retrain pipeline runs end to end, not searching hyperparameters, so it reuses the
@@ -176,7 +176,7 @@ def main() -> None:
     parser.add_argument(
         "--retrain", action="store_true",
         help="skip the v1/v2 bootstrap and register exactly one new candidate version "
-        "instead (docs/PLAN.md 5.11) — manual equivalent of the CT DAG's train task, "
+        "instead — manual equivalent of the CT DAG's train task, "
         "for testing outside Airflow. Does not touch any alias.",
     )
     parser.add_argument(
@@ -214,7 +214,7 @@ def main() -> None:
 
     client = MlflowClient()
 
-    # Idempotency (docs/PLAN.md 5.4): re-running this against a registry that already has
+    # Idempotency: re-running this against a registry that already has
     # both variants would otherwise mint v3/v4 on every `docker compose up`. Skip instead
     # of training again, and drive serving by alias/version numbers already in place.
     existing_versions = client.search_model_versions(f"name='{REGISTERED_MODEL}'")
@@ -233,7 +233,7 @@ def main() -> None:
         version, metrics = train_one(purchase_weight, train_df, holdout, args.k, lineage_tags)
         results[label] = metrics
 
-        # Serving resolves models by alias, never by number (docs/PLAN.md 5.5), so the
+        # Serving resolves models by alias, never by number, so the
         # aliases have to exist before any model API can start. Re-running the trainer
         # creates new versions and re-points the aliases at them, which keeps the script
         # idempotent in effect even though version numbers keep climbing.
@@ -245,7 +245,7 @@ def main() -> None:
     print(
         f"\noffline {hit}: V1={v1:.3f}  V2={v2:.3f}  (delta={v2 - v1:+.3f})\n"
         "Near-ties here are the intended result, not a bug — this is exactly the\n"
-        "situation the A/B test exists to settle (docs/PLAN.md section 2)."
+        "situation the A/B test exists to settle."
     )
 
 

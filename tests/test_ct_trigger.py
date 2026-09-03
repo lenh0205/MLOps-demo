@@ -1,9 +1,8 @@
-"""Phase 8 unit tests -- drift_monitor.py's Continuous Training trigger gate
-(docs/PLAN.md 5.11).
+"""Phase 8 unit tests -- drift_monitor.py's Continuous Training trigger gate.
 
 Pure-function coverage only: the actual `POST .../dagRuns` call is exercised manually
 against the real Airflow container, same as this file's Phase 7 sibling did for the DB/
-MLflow calls in drift_monitor.py (docs/PLAN.md 6).
+MLflow calls in drift_monitor.py.
 """
 
 from __future__ import annotations

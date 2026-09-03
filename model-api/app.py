@@ -1,5 +1,5 @@
 """FastAPI service that loads one version of `product-recommender` from the MLflow
-registry and serves it over REST — Phase 2 of docs/PLAN.md.
+registry and serves it over REST — Phase 2.
 
 One image, one env var: the same app serves any version, chosen entirely by `MODEL_URI`.
 
@@ -7,7 +7,7 @@ One image, one env var: the same app serves any version, chosen entirely by `MOD
     MODEL_URI=models:/product-recommender/2          # A/B experiment arm — pinned by number
 
 There is deliberately no `mlflow.set_tracking_uri(...)` call here either — the SDK reads
-`MLFLOW_TRACKING_URI` from the environment, same as trainer/train.py (docs/PLAN.md 3.2).
+`MLFLOW_TRACKING_URI` from the environment, same as trainer/train.py.
 
 Run locally (Phase 2):
     MLFLOW_TRACKING_URI=http://localhost:5000 \
@@ -22,7 +22,7 @@ import re
 import sys
 import time
 
-# Windows consoles default to cp1252 and choke on non-ASCII — see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import mlflow
@@ -54,7 +54,7 @@ class RecommendResponse(BaseModel):
 def resolve_version(model_uri: str) -> str:
     """Resolve MODEL_URI to a concrete registry version number, for /health to report.
 
-    An alias is resolved once, at *load* time (docs/PLAN.md 7.12) — moving `@champion`
+    An alias is resolved once, at *load* time — moving `@champion`
     later does not change what a running container reports until it reloads. Doing this
     resolution ourselves, rather than trusting `load_model`'s return value, is what lets
     /health show the resolved version rather than just echoing the alias name back.
@@ -84,7 +84,7 @@ class ModelHandle:
 
     def load(self) -> None:
         """Resolve + load, retrying — the registry may not be populated yet on a cold
-        stack start (docs/PLAN.md gotcha 3/4)."""
+        stack start (gotcha 3/4)."""
         last_error: Exception | None = None
         for attempt in range(1, LOAD_RETRIES + 1):
             try:
@@ -111,8 +111,8 @@ class ModelHandle:
 
 
 class Metrics:
-    """Hand-rolled — the `/metrics` seam a real Prometheus would later scrape
-    (docs/PLAN.md 5.8), not a metrics platform."""
+    """Hand-rolled — the `/metrics` seam a real Prometheus would later scrape,
+    not a metrics platform."""
 
     def __init__(self) -> None:
         self.requests_total = 0
@@ -143,7 +143,7 @@ def get_model_uri() -> str:
 
 metrics = Metrics()
 handle = ModelHandle(get_model_uri())
-handle.load()  # load once at startup, not per request (docs/PLAN.md 5.5)
+handle.load()  # load once at startup, not per request
 
 app = FastAPI(title="product-recommender model API")
 
@@ -169,7 +169,7 @@ def get_metrics() -> dict:
 @app.post("/reload")
 def reload_model() -> dict:
     """Re-resolve MODEL_URI and swap the in-memory model — the deployment mechanism
-    behind promotion and rollback (docs/PLAN.md 5.9, 7.12). No rebuild, no restart."""
+    behind promotion and rollback. No rebuild, no restart."""
     handle.load()
     return {"status": "reloaded", "model_version": handle.model_version, "model_uri": handle.model_uri}
 

@@ -1,8 +1,8 @@
-"""Rollback -- Phase 6 of docs/PLAN.md.
+"""Rollback -- Phase 6.
 
 The exact inverse of promote_model.py, and deliberately built on it rather than
 duplicating its logic: both scripts move the `@champion` alias and hit `/reload` on
-model-champion (docs/PLAN.md 5.9), so this one imports `promote()` instead of re-copying
+model-champion, so this one imports `promote()` instead of re-copying
 that alias-move + reload call. The only difference is intent and the default target (v1,
 the pre-promotion version, vs. promote_model.py's no-default -- an operator promoting
 always names a winner; an operator rolling back is usually going "back", so v1 is a safe
@@ -26,7 +26,7 @@ import argparse
 import os
 import sys
 
-# Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from promote_model import DEFAULT_PROD_URL, promote

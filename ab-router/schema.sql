@@ -1,5 +1,5 @@
--- experiment_events: one row per /recommend request through the A/B router
--- (docs/PLAN.md 5.6). Mounted into events-db via docker-entrypoint-initdb.d, so Postgres
+-- experiment_events: one row per /recommend request through the A/B router.
+-- Mounted into events-db via docker-entrypoint-initdb.d, so Postgres
 -- runs this automatically the first time the events-db data volume is initialized.
 
 CREATE TABLE IF NOT EXISTS experiment_events (

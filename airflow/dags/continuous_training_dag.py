@@ -1,14 +1,14 @@
-"""Continuous Training DAG -- Phase 8 of docs/PLAN.md (5.11, 3.3).
+"""Continuous Training DAG -- Phase 8.
 
     check_data -> train -> evaluate -> register
 
 Triggered exclusively by `analysis/drift_monitor.py`'s `POST /api/v1/dags/
 continuous_training/dagRuns` call once drift is persistent, past the sample floor, and
-data quality is OK (docs/PLAN.md 5.11's gate lives in drift_monitor.py, not here) -- hence
+data quality is OK (that gate lives in drift_monitor.py, not here) -- hence
 `schedule=None`. This DAG never polls for drift itself, and it never calls
 `promote_model.py`: it stops at registering a candidate and pointing `@challenger` at it.
 Whether the candidate becomes `@champion` is decided by the existing A/B + promotion
-machinery, run by a human, exactly as docs/PLAN.md section 2's "CT != CD" split describes.
+machinery, run by a human, exactly as the "CT != CD" split describes.
 
 `evaluate` is a ShortCircuitOperator rather than a plain PythonOperator: when the
 candidate fails the quality gate, it returns False, Airflow skips `register` (nothing is
@@ -17,7 +17,7 @@ registered, no alias moves), and the DAG still finishes as a normal, non-failed 
 
 Each task is a plain PythonOperator/ShortCircuitOperator -- no custom operators, no
 provider packages beyond the base image, same "smallest thing that works" spirit as
-evaluate_ab.py's hand-rolled z-test (docs/PLAN.md 5.7).
+evaluate_ab.py's hand-rolled z-test.
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
 # The repo's trainer/ is bind-mounted into this container (docker-compose.yml's `airflow`
 # service) at CT_REPO_ROOT/trainer so `train.py`'s own module (recommender.py,
-# evaluate_offline.py) resolve the same way they do everywhere else in this repo -- see
-# docs/PLAN.md's "Flat modules, no package" convention.
+# evaluate_offline.py) resolve the same way they do everywhere else in this repo -- the
+# "Flat modules, no package" convention.
 REPO_ROOT = Path(os.environ.get("CT_REPO_ROOT", "/opt/airflow/repo"))
 TRAINER_DIR = str(REPO_ROOT / "trainer")
 if TRAINER_DIR not in sys.path:
@@ -83,7 +83,7 @@ def train(ti, dag_run, **_context) -> None:
 
 def evaluate(ti, **_context) -> bool:
     """Returns True/False rather than raising -- ShortCircuitOperator reads the return
-    value to decide whether to skip `register` (docs/PLAN.md 5.11's FAIL branch)."""
+    value to decide whether to skip `register` (the FAIL branch)."""
     from mlflow.tracking import MlflowClient
 
     candidate_metrics = ti.xcom_pull(key="candidate_metrics", task_ids="train")
@@ -114,7 +114,7 @@ def register(ti, **_context) -> None:
 
 with DAG(
     dag_id="continuous_training",
-    description="Continuous Training: check_data -> train -> evaluate -> register (docs/PLAN.md 5.11)",
+    description="Continuous Training: check_data -> train -> evaluate -> register",
     schedule=None,  # triggered only by drift_monitor.py's REST API call, never on a timer
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,

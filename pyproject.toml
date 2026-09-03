@@ -1,3 +1,30 @@
+[project]
+name = "mlops-demo"
+version = "0.1.0"
+description = "Teaching demo of the MLOps lifecycle (dataset -> training -> MLflow tracking -> registry -> A/B serving -> promotion)"
+requires-python = "==3.12.*"
+# Union of every service's requirements.txt (trainer/, model-api/, ab-router/, analysis/),
+# pinned identically everywhere on purpose -- see CLAUDE.md's "same pinned mlflow version
+# in every requirements.txt" invariant. This is the host-side env for pytest, running
+# trainer/train.py against a local stack, and the analysis/ scripts; each service's own
+# requirements.txt remains the source Docker builds install from.
+dependencies = [
+    "mlflow==3.8.1",
+    "pandas==2.3.3",
+    "scikit-learn==1.9.0",
+    "numpy==2.5.2",
+    "cloudpickle==3.1.2",
+    "fastapi==0.141.1",
+    "uvicorn==0.52.4",
+    "httpx==0.28.1",
+    "asyncpg==0.31.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
 [tool.pytest.ini_options]
 # Phase 0 is plain modules, not an installed package: point pytest at the source
 # directories rather than adding packaging machinery the exercise does not need.

@@ -3,13 +3,13 @@
 # recommender.py/evaluate_offline.py) needs pandas/scikit-learn/numpy/cloudpickle.
 #
 # Not installed from this file directly: docker-compose.yml's `airflow` service is the
-# unmodified official image (docs/PLAN.md's "airflow standalone, no custom Dockerfile"
-# deployment shape), so these same pins are set inline as that service's
+# unmodified official image ("airflow standalone, no custom Dockerfile" deployment
+# shape), so these same pins are set inline as that service's
 # `_PIP_ADDITIONAL_REQUIREMENTS` environment variable instead of a `pip install -r`. Kept
 # here as the record of what's needed and to keep the pins visible next to the DAG code --
 # mirror any change into docker-compose.yml too.
 #
-# MUST match trainer/requirements.txt exactly -- see docs/PLAN.md's "same pinned mlflow
+# MUST match trainer/requirements.txt exactly -- the "same pinned mlflow
 # version everywhere" invariant. A version trained by the DAG's container has to be
 # loadable by model-api's container later.
 mlflow==3.8.1

@@ -1,5 +1,5 @@
 # A/B router image — proxies /recommend to model-v1 / model-v2, logs assignment +
-# outcome to events-db (docs/PLAN.md 5.6).
+# outcome to events-db.
 FROM python:3.12-slim
 
 WORKDIR /app

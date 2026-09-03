@@ -1,14 +1,14 @@
-"""Monitoring -- Phase 6 of docs/PLAN.md, windowing corrected in Phase 7 (5.8).
+"""Monitoring -- Phase 6, windowing corrected in Phase 7.
 
 Polls events-db's experiment_events table (the same source evaluate_ab.py reads) and
-prints a Requests/CTR/CVR/error-rate table per model version, on the interval docs/PLAN.md
-5.8 describes. Two layers, kept visibly separate:
+prints a Requests/CTR/CVR/error-rate table per model version, on a configurable
+interval. Two layers, kept visibly separate:
 
     ML / business layer (CTR, CVR)   -- the focus, computed from experiment_events, which
                                          already carries model_version/clicked/purchased
                                          per request. No new storage needed.
     System / API layer (error rate)  -- minimal: pulled from model-v1/model-v2's own
-                                         /metrics (docs/PLAN.md 5.5), since experiment_events
+                                         /metrics, since experiment_events
                                          has no error rows.
 
 **Recent window, not cumulative.** Phase 6 queried *all* experiment_events since
@@ -28,7 +28,7 @@ not a statistical framework, just "don't alert on noise":
 `baseline_ctr` is deliberately a parameter here, not something this script derives itself:
 "the promotion decision itself supplies the number monitoring later holds the model to"
 -- i.e. it is evaluate_ab.py's own printed CTR for each version from the healthy A/B test
-(stage a). Defaults below are this repo's own Phase 5 run (docs/PLAN.md 6): V1 7.2%, V2
+(stage a). Defaults below are this repo's own Phase 5 run: V1 7.2%, V2
 11.0%. Pass --baseline-ctr-v1/v2 if you re-run the simulation with different numbers.
 
 Usage:
@@ -44,8 +44,7 @@ import asyncio
 import os
 import sys
 
-# Windows consoles default to cp1252 and choke on non-ASCII, incl. the alert's emoji --
-# see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII, incl. the alert's emoji.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import asyncpg
@@ -94,8 +93,8 @@ DEFAULT_MODEL_URLS = {
 
 
 async def fetch_error_rates(model_urls: dict[str, str]) -> dict[str, float]:
-    """errors_total / requests_total from each model API's own /metrics (docs/PLAN.md
-    5.5) -- experiment_events has no error rows, so this is the one thing the ML-layer
+    """errors_total / requests_total from each model API's own /metrics --
+    experiment_events has no error rows, so this is the one thing the ML-layer
     query above can't answer."""
     rates: dict[str, float] = {}
     async with httpx.AsyncClient(timeout=5.0) as client:

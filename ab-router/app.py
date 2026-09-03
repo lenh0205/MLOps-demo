@@ -1,4 +1,4 @@
-"""A/B router — Phase 4 of docs/PLAN.md.
+"""A/B router — Phase 4.
 
 Deterministically assigns each user_id to v1 or v2 by hashing the user_id (never
 random — a user must stay in the same bucket across requests or the experiment is
@@ -17,7 +17,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
-# Windows consoles default to cp1252 and choke on non-ASCII — see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import asyncpg
@@ -47,7 +47,7 @@ def select_variant(user_id: str) -> str:
     """Deterministic hash of user_id -> "v1" or "v2".
 
     Never random: the same user must land in the same bucket on every request, or the
-    experiment being run is meaningless (docs/PLAN.md 2). SPLIT_PCT (env, default 50)
+    experiment being run is meaningless. SPLIT_PCT (env, default 50)
     is the percentage of the md5 hash space routed to v1.
     """
     h = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
@@ -74,7 +74,7 @@ class FeedbackRequest(BaseModel):
 
 class Metrics:
     """Hand-rolled, like model-api's — the split between arms is the cheapest sanity
-    check that deterministic hashing is actually ~50/50 (docs/PLAN.md 5.6)."""
+    check that deterministic hashing is actually ~50/50."""
 
     def __init__(self) -> None:
         self.requests_by_variant = {"v1": 0, "v2": 0}
@@ -174,8 +174,8 @@ async def recommend(request: RecommendRequest) -> RecommendResponse:
 
 @app.post("/feedback")
 async def feedback(request: FeedbackRequest) -> dict:
-    """Turns "randomly choosing between two models" into an actual A/B test
-    (docs/PLAN.md 5.6): the caller reports what the user did with the recommendations
+    """Turns "randomly choosing between two models" into an actual A/B test:
+    the caller reports what the user did with the recommendations
     a prior /recommend call returned, keyed by that call's request_id."""
     try:
         request_uuid = uuid.UUID(request.request_id)

@@ -1,6 +1,5 @@
 # Same pins as trainer/requirements.txt -- version drift between the container that logs
-# a model and the container that loads it is the classic way this demo breaks (see
-# docs/PLAN.md invariants and gotcha 6).
+# a model and the container that loads it is the classic way this demo breaks.
 mlflow==3.8.1
 pandas==2.3.3
 scikit-learn==1.9.0

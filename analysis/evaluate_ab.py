@@ -1,13 +1,13 @@
-"""Online evaluation -- Phase 5 of docs/PLAN.md.
+"""Online evaluation -- Phase 5.
 
 Queries events-db's experiment_events table (populated by ab-router + simulate_traffic.py),
 prints a CTR/CVR table per model version, and names a winner backed by a two-proportion
-z-test on CTR. That is as far as the statistics go -- "~5 lines" (docs/PLAN.md 5.7), not a
+z-test on CTR. That is as far as the statistics go -- "~5 lines", not a
 full experimentation platform.
 
 This answers a different question than trainer/evaluate_offline.py: offline hit_rate_at_5
 says which model looks better on held-out history; this says which one real (simulated)
-users actually clicked on. The two are allowed to disagree (docs/PLAN.md 2) -- that is why
+users actually clicked on. The two are allowed to disagree -- that is why
 both exist.
 
 Usage:
@@ -22,7 +22,7 @@ import os
 import sys
 from math import erf, sqrt
 
-# Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import asyncpg
@@ -41,7 +41,7 @@ def _normal_cdf(x: float) -> float:
 
 
 def two_proportion_z_test(x1: int, n1: int, x2: int, n2: int) -> tuple[float, float]:
-    """Two-sided z-test for a difference in CTR between two variants (docs/PLAN.md 5.7)."""
+    """Two-sided z-test for a difference in CTR between two variants."""
     if n1 == 0 or n2 == 0:
         return 0.0, 1.0
     p1, p2 = x1 / n1, x2 / n2

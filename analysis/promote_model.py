@@ -1,13 +1,13 @@
-"""Promotion -- Phase 5 of docs/PLAN.md.
+"""Promotion -- Phase 5.
 
 Moves the `@champion` alias to a registered version, then reloads the production model API
 so the change actually takes effect. The alias move alone changes nothing on a running
-container -- an alias is resolved once, at load time (docs/PLAN.md 7.12) -- so `/reload` is
+container -- an alias is resolved once, at load time -- so `/reload` is
 not an afterthought here, it *is* the deployment step: no image rebuild, no
 `docker compose up`, no config change, same container before and after.
 
 rollback_model.py (Phase 6) is the same call with the opposite target -- that symmetry is
-deliberate (docs/PLAN.md 5.9).
+deliberate.
 
 Usage:
     python analysis/promote_model.py v2        # after evaluate_ab.py names v2 the winner
@@ -21,7 +21,7 @@ import argparse
 import os
 import sys
 
-# Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import httpx

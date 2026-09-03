@@ -1,8 +1,8 @@
 # Serving image — one app, one env var (MODEL_URI). The same image runs as both A/B
-# arms in docker-compose.yml; only MODEL_URI differs (docs/PLAN.md 5.5).
+# arms in docker-compose.yml; only MODEL_URI differs.
 #
 # recommender.py is NOT copied in here: it travels inside the logged pyfunc artifact via
-# train.py's `code_paths`, which is the whole point of pyfunc packaging (docs/PLAN.md 5.4).
+# train.py's `code_paths`, which is the whole point of pyfunc packaging.
 FROM python:3.12-slim
 
 WORKDIR /app

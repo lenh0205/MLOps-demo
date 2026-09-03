@@ -1,4 +1,4 @@
-# Our services only (docs/PLAN.md 2, 4). Joins the official MLflow stack's network by
+# Our services only. Joins the official MLflow stack's network by
 # name rather than deriving it from a project/COMPOSE_PROJECT_NAME trick (gotcha 1).
 #
 # Bring both stacks up with:
@@ -8,8 +8,8 @@
 services:
   # Override, not a copy: mlflow-stack/ stays untouched (gotcha 7), and Compose merges
   # this environment map into the vendored `mlflow` service's own. mlflow 3.8.1 added
-  # Host-header validation that defaults to localhost + private IPs only (see gotcha 13
-  # in docs/PLAN.md) — without this, any request whose Host header is the Compose service
+  # Host-header validation that defaults to localhost + private IPs only (gotcha 13) —
+  # without this, any request whose Host header is the Compose service
   # name (e.g. "mlflow:5000", as trainer/model-api send) gets a 403.
   mlflow:
     environment:
@@ -56,9 +56,9 @@ services:
 
   # Production, distinct from the A/B arms above: model-v1/model-v2 are pinned by version
   # number *on purpose*, because an experiment must name exactly which versions it is
-  # comparing (docs/PLAN.md 5.5). This service is what @champion actually means at
+  # comparing. This service is what @champion actually means at
   # runtime — the container promote_model.py / rollback_model.py's /reload targets, and
-  # the one whose /health flips between v1 and v2 with no rebuild (docs/PLAN.md 7.12).
+  # the one whose /health flips between v1 and v2 with no rebuild.
   model-champion:
     build:
       context: .
@@ -74,14 +74,12 @@ services:
       trainer:
         condition: service_completed_successfully
 
-  # Continuous Training orchestrator (docs/PLAN.md 5.11, Phase 8) — the official image,
+  # Continuous Training orchestrator (Phase 8) — the official image,
   # unmodified, running `airflow standalone` (webserver + scheduler + triggerer + a SQLite
   # metadata DB, all in this one container). Deliberately not a production Airflow
   # deployment (separate webserver/scheduler/worker, Redis, its own Postgres) — the demo
-  # needs one DAG to run reliably, not an Airflow cluster (docs/PLAN.md section 2's
-  # "Airflow deployment shape" decision, same trade-off as the Prometheus rejection in
-  # 5.8). Only orchestrates the retraining DAG — it does not replace Compose as the
-  # infrastructure layer (section 2's responsibility-separation diagram).
+  # needs one DAG to run reliably, not an Airflow cluster. Only orchestrates the
+  # retraining DAG — it does not replace Compose as the infrastructure layer.
   airflow:
     image: apache/airflow:2.10.5-python3.12
     container_name: airflow
@@ -92,7 +90,7 @@ services:
     # random string). So the admin user is created explicitly first, with `|| true` for
     # idempotency across container restarts, then standalone reuses that existing user
     # instead of generating a new one — giving drift_monitor.py's --airflow-username/
-    # --airflow-password defaults (docs/PLAN.md 5.11) a predictable login.
+    # --airflow-password defaults a predictable login.
     command: >
       bash -c "airflow db migrate &&
       (airflow users delete --username admin || true) &&
@@ -123,7 +121,7 @@ services:
       mlflow:
         condition: service_healthy
 
-  # Our own small Postgres for A/B outcomes (docs/PLAN.md 2, 5.6) — deliberately not
+  # Our own small Postgres for A/B outcomes — deliberately not
   # mlflow-postgres: the experiment store is application data, not MLflow metadata.
   # schema.sql is mounted into docker-entrypoint-initdb.d, so Postgres creates
   # experiment_events itself the first time this container's volume is initialized.

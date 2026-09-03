@@ -95,7 +95,7 @@ def test_purchase_weight_changes_the_ranking():
 def test_recommend_never_exceeds_the_unseen_ceiling(interactions):
     """`k` larger than the catalogue is capped by the already-seen filter, not padded past it.
 
-    The filter is load-bearing (see docs/PLAN.md 5.1), so the most a user can ever be
+    The filter is load-bearing, so the most a user can ever be
     shown is |catalogue| - |their history|. Padding fills up to that ceiling and stops;
     it must never re-suggest something the user has already interacted with.
     """

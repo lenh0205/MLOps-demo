@@ -1,8 +1,8 @@
-"""Synthetic traffic simulator -- Phase 5 (stage a) / Phase 6 (stage b) of docs/PLAN.md.
+"""Synthetic traffic simulator -- Phase 5 (stage a) / Phase 6 (stage b).
 
 Sends synthetic users through the A/B router, decides click/purchase per the per-variant
 probabilities for the requested stage, and reports the outcome back via /feedback. Two
-stages, one script (--stage a|b), not two scripts -- see docs/PLAN.md 5.7:
+stages, one script (--stage a|b), not two scripts:
 
     stage a (healthy, during the A/B test)   V1 CTR  8%   V2 CTR 11%  -> V2 wins online
     stage b (degraded, after promotion)      V1 CTR  8%   V2 CTR  4%  -> champion decays
@@ -11,7 +11,7 @@ The per-variant probabilities are simulation inputs, deliberately fixed -- nothi
 infers degradation from the model; stage b stages an outage so Phase 6's monitor/rollback
 have something real to react to.
 
-**`--product-shift` -- Phase 7 addition (docs/PLAN.md 5.10).** By default every request
+**`--product-shift` -- Phase 7 addition.** By default every request
 uses a synthetic cold-start user_id (`sim-{stage}-N`), so every request to a given variant
 gets that variant's fixed popularity list back -- there is no user history to vary
 recommendations by. `--product-shift` switches to real user_ids from data/interactions.csv,
@@ -19,7 +19,7 @@ narrowed to a small pool (`--shift-users`, default 15), so the champion's *recom
 products concentrate on those few users' shared affinity -- a real shift in the
 `recommendations` distribution drift_monitor.py measures, not just a CTR probability.
 Intended for stage b, so a degraded run trips CTR degradation and recommendation drift
-together (docs/PLAN.md 5.10's "two independent signals"); the base `--stage b` behaviour
+together ("two independent signals"); the base `--stage b` behaviour
 without the flag is unchanged from Phase 6.
 
 Usage:
@@ -37,7 +37,7 @@ import random
 import sys
 from pathlib import Path
 
-# Windows consoles default to cp1252 and choke on non-ASCII -- see docs/PLAN.md 7.11.
+# Windows consoles default to cp1252 and choke on non-ASCII.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import httpx
@@ -48,14 +48,14 @@ DEFAULT_CONCURRENCY = 50
 DEFAULT_DATA = Path(__file__).resolve().parent.parent / "data" / "interactions.csv"
 DEFAULT_SHIFT_USERS = 15
 
-# variant -> CTR, by stage. docs/PLAN.md 5.7's table.
+# variant -> CTR, by stage.
 STAGE_CTR = {
     "a": {"v1": 0.08, "v2": 0.11},
     "b": {"v1": 0.08, "v2": 0.04},
 }
 
 # variant -> P(purchase | clicked), held fixed across stages so CVR simply follows CTR
-# down when a variant degrades. Chosen so stage a reproduces docs/PLAN.md 5.7's example
+# down when a variant degrades. Chosen so stage a reproduces the example
 # table exactly: V1 8.0%/2.4%, V2 11.0%/3.6%.
 PURCHASE_GIVEN_CLICK = {"v1": 0.30, "v2": 0.3273}
 
@@ -138,7 +138,7 @@ def main() -> None:
     parser.add_argument(
         "--product-shift", action="store_true",
         help="sample from a narrow pool of real user_ids instead of synthetic cold-start ids, "
-        "so recommended products visibly shift too (intended for --stage b, docs/PLAN.md 5.10)",
+        "so recommended products visibly shift too (intended for --stage b)",
     )
     parser.add_argument(
         "--shift-users", type=int, default=DEFAULT_SHIFT_USERS,

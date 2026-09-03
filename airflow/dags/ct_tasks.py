@@ -1,9 +1,9 @@
-"""Continuous Training task logic -- Phase 8 of docs/PLAN.md (5.11).
+"""Continuous Training task logic -- Phase 8.
 
 Plain, Airflow-free functions so they are importable both by continuous_training_dag.py's
 PythonOperators and directly by pytest -- no `apache-airflow` install needed to test this
 module, the same "pure-function coverage here, real stack for the rest" split every other
-analysis/ script in this repo already uses (docs/PLAN.md 6).
+analysis/ script in this repo already uses.
 
 continuous_training_dag.py is the thin Airflow wiring around these functions plus the two
 steps that genuinely need a live MLflow server (train, evaluate-against-champion) and so
@@ -25,7 +25,7 @@ MIN_ROWS = 100
 
 
 def validate_dataset(path: Path, min_rows: int = MIN_ROWS) -> None:
-    """The `check_data` task (docs/PLAN.md 5.11): fail the DAG early rather than training
+    """The `check_data` task: fail the DAG early rather than training
     on garbage. Raises instead of returning a bool -- Airflow marks a task failed on any
     exception, which is exactly "stop before train runs"."""
     if not path.exists():
@@ -50,9 +50,8 @@ def validate_dataset(path: Path, min_rows: int = MIN_ROWS) -> None:
 def passes_quality_gate(
     candidate_hit_rate: float, champion_hit_rate: float, tolerance: float = 0.0
 ) -> bool:
-    """The `evaluate` task's quality gate (docs/PLAN.md 5.11): the candidate must be >=
+    """The `evaluate` task's quality gate: the candidate must be >=
     the current champion's hit_rate_at_5, or within `tolerance` of it. `tolerance=0.0` is
-    the default -- strict >=, picked here as the hyperparameter the plan doc left open
-    rather than guessed at in documentation. A candidate that regresses offline accuracy,
+    the default -- strict >=. A candidate that regresses offline accuracy,
     even slightly, should not become `@challenger`."""
     return candidate_hit_rate >= champion_hit_rate - tolerance

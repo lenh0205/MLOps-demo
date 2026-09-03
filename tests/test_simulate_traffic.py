@@ -1,4 +1,4 @@
-"""Phase 7 unit test -- simulate_traffic.py's --product-shift user pool (docs/PLAN.md 5.10).
+"""Phase 7 unit test -- simulate_traffic.py's --product-shift user pool.
 
 No router/events-db involved: run_one's HTTP calls are exercised manually against the
 real stack, same as the rest of simulate_traffic.py.

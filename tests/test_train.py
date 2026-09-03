@@ -1,4 +1,4 @@
-"""Phase 7 unit tests -- train.py's lineage-tag helpers (docs/PLAN.md 5.4).
+"""Phase 7 unit tests -- train.py's lineage-tag helpers.
 
 Pure-function coverage only: the tags actually landing on a run is verified manually
 against the real MLflow server, same as the rest of train.py's MLflow calls.

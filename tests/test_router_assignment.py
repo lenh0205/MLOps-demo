@@ -5,9 +5,9 @@ unset, and the asyncpg pool is only opened in the FastAPI startup hook, so impor
 the module here never touches a real Postgres connection.
 
 Loaded by explicit file path, not `import app`: pyproject.toml's pythonpath lists both
-model-api/ and ab-router/, and both directories have an app.py (docs/PLAN.md layout,
-section 4) — a bare `import app` would silently resolve to whichever comes first on
-pythonpath (model-api's, which requires MODEL_URI at import time) rather than this one.
+model-api/ and ab-router/, and both directories have an app.py — a bare `import app`
+would silently resolve to whichever comes first on pythonpath (model-api's, which
+requires MODEL_URI at import time) rather than this one.
 """
 
 from __future__ import annotations

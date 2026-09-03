@@ -2,7 +2,7 @@
 #
 # The trainer and model-api MUST end up on the same mlflow version — version drift
 # between the image that logs a model and the image that loads it is the classic way
-# this demo breaks. See docs/PLAN.md section 5.4 and gotcha 6.
+# this demo breaks (gotcha 6).
 #
 # mlflow-stack/.env pins the *server* image to v3.8.1 -- the SAME version. 3.8.1 is the
 # newest that exists BOTH on PyPI and as a ghcr.io/mlflow/mlflow image: the published

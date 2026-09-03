@@ -22,7 +22,9 @@ script to a registry to a REST API to an A/B test to a promotion/rollback, keep 
 - **WSL2 Ubuntu** if you're on Windows — run everything from a WSL shell, not
   PowerShell; paths under `/mnt/...` are slow.
 - **Docker** and **Docker Compose**.
-- **Python 3.12** for running things outside containers (venv, tests, `analysis/` scripts).
+- **[uv](https://docs.astral.sh/uv/)** for running things outside containers (venv, tests,
+  `analysis/` scripts) — it also manages the Python 3.12 interpreter itself, so a system
+  Python install isn't required.
 
 ---
 
@@ -30,10 +32,9 @@ script to a registry to a REST API to an A/B test to a promotion/rollback, keep 
 
 ```bash
 # 1. One-time: get the venv for local tooling (tests, analysis/ scripts, data generation)
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r trainer/requirements.txt -r analysis/requirements.txt pytest
+uv sync    # creates .venv from pyproject.toml + uv.lock, Python 3.12 pinned via .python-version
 
-pytest    # 46 tests, no live stack needed
+uv run pytest    # 70 tests, no live stack needed
 
 # 2. Bring up MLflow + our services in one command (the -p / --project-directory /
 #    --env-file flags matter: a bare `docker compose -f a -f b up` silently
@@ -85,8 +86,7 @@ vs the same against `:8002` — same request, different model, different ranking
 **④ A/B test traffic.**
 
 ```bash
-source .venv/bin/activate
-python analysis/simulate_traffic.py --stage a --n 10000
+uv run python analysis/simulate_traffic.py --stage a --n 10000
 ```
 
 Sends synthetic users through `ab-router` (deterministic `md5(user_id)` hashing splits
@@ -96,7 +96,7 @@ and outcome lands in `events-db.experiment_events`.
 **⑤ Evaluate online.**
 
 ```bash
-python analysis/evaluate_ab.py
+uv run python analysis/evaluate_ab.py
 ```
 
 Prints a CTR/CVR table per version and a two-proportion z-test verdict — e.g. "V2 wins
@@ -105,7 +105,7 @@ Prints a CTR/CVR table per version and a two-proportion z-test verdict — e.g. 
 **⑥ Promote.**
 
 ```bash
-python analysis/promote_model.py v2
+uv run python analysis/promote_model.py v2
 ```
 
 Moves the `@champion` alias to v2 via `MlflowClient`, then `POST`s `/reload` on
@@ -115,9 +115,9 @@ redeploy, no config change.
 **⑦ Degrade + monitor.**
 
 ```bash
-python analysis/simulate_traffic.py --stage b --product-shift --n 5000
-python analysis/monitor.py --once
-python analysis/drift_monitor.py
+uv run python analysis/simulate_traffic.py --stage b --product-shift --n 5000
+uv run python analysis/monitor.py --once
+uv run python analysis/drift_monitor.py
 ```
 
 Stage B simulates the now-promoted model decaying online. `monitor.py` compares a recent
@@ -130,7 +130,7 @@ visibly concentrate, giving drift something real to detect alongside the CTR dro
 **⑧ Roll back.**
 
 ```bash
-python analysis/rollback_model.py
+uv run python analysis/rollback_model.py
 ```
 
 Same alias-move-then-`/reload` operation as promotion, just defaulted back to v1.

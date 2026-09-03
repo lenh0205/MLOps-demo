@@ -2,7 +2,7 @@
 
 Pure-function coverage only: drift_monitor.py's async DB/MLflow calls are exercised
 manually against the real stack, same as evaluate_ab.py / promote_model.py were in
-earlier phases (docs/PLAN.md 6).
+earlier phases.
 """
 
 from __future__ import annotations
